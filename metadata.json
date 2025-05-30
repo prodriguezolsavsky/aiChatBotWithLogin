@@ -1,0 +1,6 @@
+{
+  "name": "Copy 1 of AI Chat Assistant (Gemini)",
+  "description": "A web application that allows users to chat with an AI assistant powered by Google Gemini.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
