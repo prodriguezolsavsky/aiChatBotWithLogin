@@ -7,23 +7,53 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Identity Services client library -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      // IMPORTANT: Configure your N8N Webhook URL here
+      // The n8nService.ts file relies on this configuration.
+      window.APP_CONFIG = {
+        N8N_WEBHOOK_URL: 'https://n8n-app.agreeableriver-225df3a2.westus.azurecontainerapps.io/webhook/chat', // <<< REPLACE THIS WITH YOUR ACTUAL N8N WEBHOOK URL
+        API_KEY: '' // Placeholder for API_KEY if needed by other parts or future n8n interactions
+      };
+      if (window.APP_CONFIG.N8N_WEBHOOK_URL === 'https://n8n-app.agreeableriver-225df3a2.westus.azurecontainerapps.io/webhook/chat' || !window.APP_CONFIG.N8N_WEBHOOK_URL) {
+        console.warn(
+          "IMPORTANT: N8N_WEBHOOK_URL is not configured in index.html (window.APP_CONFIG.N8N_WEBHOOK_URL). " +
+          "The chat functionality will not work correctly. Please update it with your actual n8n webhook URL."
+        );
+      }
+    </script>
     <style>
-      /* Custom scrollbar for webkit browsers */
+      /* General page styling for better aesthetics with the new layout */
+      html, body, #root {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* Prevent body scrollbars when sidebar/main content handle their own */
+      }
+      
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Custom scrollbar for main chat window (ChatWindow.tsx might have specific one too) */
+      /* This is a more general scrollbar for Webkit, if needed */
       ::-webkit-scrollbar {
         width: 8px;
+        height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #1f2937; /* gray-800 */
+        background: #2d3748; /* gray-800 (Tailwind) */
       }
       ::-webkit-scrollbar-thumb {
-        background: #4b5563; /* gray-600 */
+        background: #4a5568; /* gray-600 (Tailwind) */
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #6b7280; /* gray-500 */
+        background: #718096; /* gray-500 (Tailwind) */
       }
 
-      /* Custom animations for typing indicator */
+      /* Custom animations for typing indicator (already present) */
       @keyframes bounce_1 {
         0%, 80%, 100% { transform: scale(0); }
         40% { transform: scale(1.0); }
@@ -47,11 +77,6 @@
       .animate-bounce_3 {
         animation: bounce_3 1.4s infinite ease-in-out both;
       }
-      html, body, #root {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-      }
     </style>
   <script type="importmap">
 {
@@ -63,28 +88,11 @@
   }
 }
 </script>
-<script>
-  // IMPORTANT: Configure your application settings here.
-  // For N8N_WEBHOOK_URL: Replace 'YOUR_N8N_WEBHOOK_URL_HERE' with your actual n8n webhook URL.
-  // For API_KEY: If you are using Gemini directly, replace 'YOUR_GEMINI_API_KEY_HERE' with your actual API key.
-  // In a production environment, these values should ideally be injected by your deployment process
-  // or managed securely, especially API keys.
-  window.APP_CONFIG = {
-    N8N_WEBHOOK_URL: 'https://n8n-app.agreeableriver-225df3a2.westus.azurecontainerapps.io/webhook/chat', // Replace this with your actual N8N Webhook URL
-    API_KEY: 'IzaSyCZ3yvxwx1GCq19HUs3sWL9obh7eIPsxnk' // Replace this if you use Gemini directly
-  };
-</script>
+<link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-gray-900">
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root" class="h-screen"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-    -->
-  </body>
-</html><link rel="stylesheet" href="index.css">
-<script src="index.tsx" type="module"></script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface LoginPageProps {
@@ -5,13 +6,15 @@ interface LoginPageProps {
   isClientIDConfigured: boolean;
   googleSignInButtonId: string;
   gsiError: string | null;
+  // onDeveloperBypassLogin?: () => void; // Removed prop
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ 
   gsiLoaded, 
   isClientIDConfigured, 
   googleSignInButtonId,
-  gsiError 
+  gsiError,
+  // onDeveloperBypassLogin // Removed prop
 }) => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
@@ -45,6 +48,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             <p>Google Sign-In is not available due to a configuration problem. Please contact the site administrator.</p>
           </div>
         )}
+
+        {/* Developer Bypass Button - REMOVED */}
+        {/* 
+        {onDeveloperBypassLogin && (
+          <div className="mt-6">
+            <button
+              onClick={onDeveloperBypassLogin}
+              className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold py-2.5 px-4 rounded-lg transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 focus:ring-offset-gray-800"
+              title="For development purposes only"
+            >
+              Dev Bypass Login
+            </button>
+            <p className="text-xs text-yellow-300 mt-2">
+              (Development Only - Remove in Production)
+            </p>
+          </div>
+        )}
+        */}
+        {/* End Developer Bypass Button Removal */}
+        
         <p className="mt-8 text-xs text-gray-500">
           Your conversations will be stored locally in your browser.
         </p>

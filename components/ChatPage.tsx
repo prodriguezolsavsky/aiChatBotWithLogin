@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChatMessageData, MessageSender } from '../types';
 import { ChatWindow } from './ChatWindow';
 import { ChatInput } from './ChatInput';
-import { getN8nChatResponse } from '../services/n8nService'; // Updated import
+import { getN8nChatResponse } from '../services/n8nService';
 
 const TYPING_INDICATOR_ID = 'typing-indicator-message';
 
@@ -16,8 +16,36 @@ interface UserInfo {
 
 interface ChatPageProps {
   userInfo: UserInfo;
+  chatId: string;
   onLogout: () => void;
+  onMessagesUpdate: (chatId: string, messages: ChatMessageData[]) => void;
 }
+
+// --- SVG Icons ---
+const ShareIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-5 h-5"}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+  </svg>
+);
+
+const SettingsIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-5 h-5"}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+  </svg>
+);
+
+const LogoutIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-5 h-5"}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+  </svg>
+);
+
+const DefaultAvatarIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-8 h-8"}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+    </svg>
+);
+// --- End SVG Icons ---
 
 const createMessage = (text: string, sender: MessageSender): ChatMessageData => ({
   id: Date.now().toString(36) + Math.random().toString(36).substring(2),
@@ -26,58 +54,70 @@ const createMessage = (text: string, sender: MessageSender): ChatMessageData => 
   timestamp: new Date(),
 });
 
-export const ChatPage: React.FC<ChatPageProps> = ({ userInfo, onLogout }) => {
+export const ChatPage: React.FC<ChatPageProps> = ({ userInfo, chatId, onLogout, onMessagesUpdate }) => {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null); // Still used for localStorage keys
-  const hasInitializedMessages = useRef(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [showCopiedNotification, setShowCopiedNotification] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // Initialize or retrieve user-specific session ID (for localStorage)
   useEffect(() => {
-    const userSpecificSessionKey = `chatSessionId_user_${userInfo.id}`;
-    let sid = localStorage.getItem(userSpecificSessionKey);
-    if (!sid) {
-      sid = `user_${userInfo.id}_${Date.now().toString(36)}${Math.random().toString(36).substring(2)}`;
-      localStorage.setItem(userSpecificSessionKey, sid);
-    }
-    setSessionId(sid);
-  }, [userInfo.id]);
-
-  // Load messages from localStorage and set initial message
-  useEffect(() => {
-    if (sessionId && !hasInitializedMessages.current) {
-      const storedMessagesKey = `chatMessages_${sessionId}`;
-      const storedMessages = localStorage.getItem(storedMessagesKey);
-      if (storedMessages) {
-        try {
-          const parsedMessages: ChatMessageData[] = JSON.parse(storedMessages).map((msg: any) => ({
-            ...msg,
-            timestamp: new Date(msg.timestamp)
-          }));
-          setMessages(parsedMessages);
-        } catch (e) {
-          console.error("Failed to parse stored messages:", e);
-          setMessages([
-            createMessage(`Welcome back, ${userInfo.name || 'User'}! How can I help you today?`, MessageSender.BOT)
-          ]);
-        }
-      } else {
-         setMessages([
-          createMessage(`Hello, ${userInfo.name || 'User'}! How can I help you today?`, MessageSender.BOT)
-        ]);
+    const storedMessagesKey = `chatMessages_${chatId}`;
+    const storedMessages = localStorage.getItem(storedMessagesKey);
+    if (storedMessages) {
+      try {
+        const parsedMessages: ChatMessageData[] = JSON.parse(storedMessages).map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp) // Convert ISO string back to Date object
+        }));
+        setMessages(parsedMessages);
+      } catch (e) {
+        console.error(`Failed to parse stored messages for chat ${chatId}:`, e);
+        setMessages([]); // Fallback to empty if parsing fails
       }
-      hasInitializedMessages.current = true;
+    } else {
+      // No stored messages for this chat ID, could be a new chat.
+      // App.tsx's handleNewChat is responsible for seeding the welcome message.
+      setMessages([]);
     }
-  }, [sessionId, userInfo.name]);
+    setIsLoading(false);
+    setIsUserMenuOpen(false); 
+  }, [chatId]);
 
-  // Save messages to localStorage whenever they change
+  // Save messages to localStorage when they change
   useEffect(() => {
-    if (sessionId && messages.length > 0 && hasInitializedMessages.current) {
-      const storedMessagesKey = `chatMessages_${sessionId}`;
-      localStorage.setItem(storedMessagesKey, JSON.stringify(messages));
+    if (chatId && messages) { // Ensure chatId is present and messages array exists (even if empty)
+      const storedMessagesKey = `chatMessages_${chatId}`;
+      try {
+        localStorage.setItem(storedMessagesKey, JSON.stringify(messages.map(msg => ({
+          ...msg,
+          // Ensure timestamp is ISO string for JSON storage
+          timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp
+        }))));
+      } catch (error) {
+        console.error(`Failed to save messages for chat ${chatId} to localStorage:`, error);
+      }
+      // Notify App component about message updates for session management (e.g., title, lastUpdated)
+      // This should be called regardless of localStorage success if messages array has changed.
+      onMessagesUpdate(chatId, messages);
     }
-  }, [messages, sessionId]);
-  
+  }, [messages, chatId, onMessagesUpdate]);
+
+  // Close user menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isUserMenuOpen]);
+
   const addMessageToList = useCallback((newMessage: ChatMessageData) => {
     setMessages(prevMessages => [...prevMessages.filter(m => m.id !== TYPING_INDICATOR_ID), newMessage]);
   }, []);
@@ -96,23 +136,29 @@ export const ChatPage: React.FC<ChatPageProps> = ({ userInfo, onLogout }) => {
   }, []);
 
   const handleSendMessage = useCallback(async (userMessageText: string) => {
-    if (!sessionId) {
-      console.error("Session ID not available for local storage. Cannot send message.");
-      addMessageToList(createMessage("Error: Session ID is missing for storage. Please refresh the page.", MessageSender.ERROR));
+    if (!chatId) {
+      console.error("Chat ID not available. Cannot send message.");
+      addMessageToList(createMessage("Error: Chat ID is missing. Please try selecting a chat again.", MessageSender.ERROR));
       return;
     }
     
     const userMessage = createMessage(userMessageText, MessageSender.USER);
+    // Add user message to local state immediately
+    // The effect hook [messages, chatId, onMessagesUpdate] will then persist this change.
     setMessages(prevMessages => [...prevMessages.filter(m => m.id !== TYPING_INDICATOR_ID), userMessage]);
-
+    
     setIsLoading(true);
     showTypingIndicator();
 
-    const historyForN8N = messages.filter(m => m.id !== TYPING_INDICATOR_ID && (m.sender === MessageSender.USER || m.sender === MessageSender.BOT));
+    // Prepare history *before* adding the new user message for the API call
+    // Or, if the API expects the latest user message in history, include it.
+    // Current implementation sends history *including* the latest user message.
+    const currentMessagesForHistory = messages.filter(m => m.id !== TYPING_INDICATOR_ID);
+    const historyForN8n = [...currentMessagesForHistory, userMessage];
+
 
     try {
-      // Use the new n8n service
-      const botResponseText = await getN8nChatResponse(userMessageText, historyForN8N);
+      const botResponseText = await getN8nChatResponse(userMessageText, historyForN8n, chatId);
       removeTypingIndicator();
       addMessageToList(createMessage(botResponseText, MessageSender.BOT));
     } catch (error) {
@@ -123,36 +169,106 @@ export const ChatPage: React.FC<ChatPageProps> = ({ userInfo, onLogout }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [addMessageToList, showTypingIndicator, removeTypingIndicator, sessionId, messages]);
+  }, [addMessageToList, showTypingIndicator, removeTypingIndicator, chatId, messages]); // messages is a dependency for history
+
+  const handleShareChat = async () => {
+    const chatText = messages
+      .filter(msg => msg.sender === MessageSender.USER || msg.sender === MessageSender.BOT)
+      .map(msg => `${msg.sender === MessageSender.USER ? 'User' : 'Bot'}: ${msg.text}`)
+      .join('\n');
+
+    try {
+      await navigator.clipboard.writeText(chatText);
+      setShowCopiedNotification(true);
+      setTimeout(() => setShowCopiedNotification(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy chat text: ', err);
+      alert('Failed to copy chat to clipboard. You may need to enable clipboard permissions for this site.');
+    }
+  };
+
+  const handleSettingsClick = () => {
+    alert('Settings functionality is not yet implemented.');
+    setIsUserMenuOpen(false);
+  };
 
   return (
-    <div className="flex flex-col h-full max-h-screen bg-gray-900 text-white sm:max-w-2xl md:max-w-3xl mx-auto sm:shadow-2xl sm:rounded-lg sm:my-0 md:my-4 overflow-hidden">
-      <header className="bg-gray-800 p-3 sm:p-4 shadow-md flex-shrink-0 flex items-center justify-between min-h-[60px] sm:min-h-[68px]">
-        <div className="flex items-center space-x-2 sm:space-x-3">
-            {userInfo.picture && (
-            <img 
-                src={userInfo.picture} 
-                alt={userInfo.name || 'User avatar'} 
-                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-blue-400" 
-                referrerPolicy="no-referrer" 
-            />
-            )}
-            <div>
-                <span className="text-base sm:text-lg font-semibold text-white truncate max-w-[120px] sm:max-w-[180px] md:max-w-[250px]" title={userInfo.name || 'AI Chat Assistant'}>
-                    {userInfo.name || 'AI Chat Assistant'}
-                </span>
-                {/* You might want to update "Powered by Gemini" if your n8n uses a different model */}
-                {userInfo.name && <p className="text-xs text-gray-400 hidden sm:block">Powered by AI</p>}
-                {!userInfo.name && <p className="text-xs text-gray-400 hidden sm:block">Powered by AI</p>}
-            </div>
+    <div className="flex flex-col h-full max-h-screen bg-gray-800 text-white sm:shadow-inner overflow-hidden">
+      <header className="bg-gray-700 p-3 sm:p-4 shadow-md flex-shrink-0 flex items-center justify-between min-h-[60px] sm:min-h-[68px] border-b border-gray-600">
+        <div>
+          <h1 className="text-lg sm:text-xl font-semibold text-gray-100">
+            Conversation
+          </h1>
         </div>
-        <button
-            onClick={onLogout}
-            className="bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-medium py-1.5 px-2.5 sm:py-2 sm:px-4 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-800"
-            aria-label="Logout"
-        >
-            Logout
-        </button>
+
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <button
+            onClick={handleShareChat}
+            className="flex items-center bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700"
+            title="Copy chat to clipboard"
+            aria-live="polite"
+          >
+            <ShareIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-1.5" />
+            Share
+          </button>
+          {showCopiedNotification && <span className="text-xs text-green-400 animate-pulse">Copied!</span>}
+          
+          <div className="relative" ref={userMenuRef}>
+            <button
+              onClick={() => setIsUserMenuOpen(prev => !prev)}
+              className="p-0.5 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-gray-700"
+              aria-label="Open user menu"
+              aria-haspopup="true"
+              aria-expanded={isUserMenuOpen}
+              id="user-menu-button"
+            >
+              {userInfo.picture ? (
+                <img
+                  src={userInfo.picture}
+                  alt="User avatar"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border-2 border-gray-500 group-hover:border-blue-400 transition-colors"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <DefaultAvatarIcon className="w-8 h-8 sm:w-9 sm:h-9 text-gray-400 p-1 bg-gray-600 rounded-full border-2 border-gray-500" />
+              )}
+            </button>
+
+            {isUserMenuOpen && (
+              <div
+                className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50 py-1 origin-top-right"
+                role="menu"
+                aria-orientation="vertical"
+                aria-labelledby="user-menu-button"
+              >
+                <div className="px-4 py-3 border-b border-gray-700">
+                  <p className="text-sm font-semibold text-gray-100 truncate" title={userInfo.name}>
+                    {userInfo.name || 'User'}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate" title={userInfo.email}>
+                    {userInfo.email || 'No email provided'}
+                  </p>
+                </div>
+                <button
+                  onClick={handleSettingsClick}
+                  className="w-full text-left flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                  role="menuitem"
+                >
+                  <SettingsIcon className="w-4 h-4 mr-3 text-gray-400" />
+                  Settings
+                </button>
+                <button
+                  onClick={() => { onLogout(); setIsUserMenuOpen(false); }}
+                  className="w-full text-left flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                  role="menuitem"
+                >
+                  <LogoutIcon className="w-4 h-4 mr-3 text-gray-400" />
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </header>
       <ChatWindow messages={messages} />
       <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />

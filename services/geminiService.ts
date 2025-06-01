@@ -3,23 +3,22 @@ import { GoogleGenAI, GenerateContentResponse, Content, Part } from "@google/gen
 import { ChatMessageData, MessageSender } from '../types';
 
 // TypeScript declaration to inform about APP_CONFIG on the window object
-// This might be duplicated if n8nService.ts is also imported, but it's safe.
 declare global {
   interface Window {
     APP_CONFIG?: {
       N8N_WEBHOOK_URL?: string;
-      API_KEY?: string;
+      API_KEY?: string; // This might still be used by n8nService or other parts
     };
+    process?: { // Added for process.env awareness in browser context if populated by build tool
+      env?: {
+        [key: string]: string | undefined;
+        API_KEY?: string;
+        N8N_WEBHOOK_URL?: string;
+      }
+    }
   }
 }
 
-const apiKeyFromConfig = window.APP_CONFIG?.API_KEY;
-
-if (!apiKeyFromConfig || apiKeyFromConfig === 'IzaSyCZ3yvxwx1GCq19HUs3sWL9obh7eIPsxnk') {
-  console.error("Gemini API Key (API_KEY) is not configured or is set to placeholder in index.html (window.APP_CONFIG.API_KEY). Chat functionality using Gemini will not work. Please update it in index.html.");
-}
-
-const ai = new GoogleGenAI({ apiKey: apiKeyFromConfig! }); // Use non-null assertion, error above should catch undefined
 const GEMINI_MODEL_NAME = 'gemini-2.5-flash-preview-04-17';
 
 function formatChatHistoryForGemini(chatMessages: ChatMessageData[]): Content[] {
@@ -38,21 +37,17 @@ export async function getGeminiChatResponse(
   userMessage: string,
   history: ChatMessageData[] // This is the existing chat history from ChatPage
 ): Promise<string> {
-  const currentApiKey = window.APP_CONFIG?.API_KEY;
-  if (!currentApiKey || currentApiKey === 'YOUR_GEMINI_API_KEY_HERE') {
-    throw new Error("Gemini API Key is not configured. Please set it in the APP_CONFIG script in index.html.");
+  const currentApiKey = process.env.API_KEY; 
+  if (!currentApiKey) {
+    console.error("Gemini API Key (process.env.API_KEY) is not configured or accessible. This must be set via environment variables during the build/deployment process.");
+    throw new Error("Gemini API Key is not configured. Please ensure it is set in the application's environment settings for deployment.");
   }
-  // If the key might change dynamically and the 'ai' instance needs re-initialization,
-  // you might need to re-initialize 'ai' here or ensure it's always up-to-date.
-  // For simplicity, we assume it's set at load time.
-
+  
   const formattedHistory = formatChatHistoryForGemini(history);
 
   try {
-    // If 'ai' was initialized with a placeholder, it might fail.
-    // It's better to initialize 'ai' only when key is valid, or handle error better.
-    // For now, rely on the initial check.
-    const chat = ai.chats.create({
+    const aiClient = new GoogleGenAI({ apiKey: currentApiKey });
+    const chat = aiClient.chats.create({
       model: GEMINI_MODEL_NAME,
       history: formattedHistory,
     });
@@ -69,8 +64,6 @@ export async function getGeminiChatResponse(
   } catch (error) {
     console.error('Error calling Gemini API:', error);
     if (error instanceof Error) {
-      // Check for specific Gemini API error structures if available, otherwise use message
-      // For example, error.response?.data?.error?.message
       throw new Error(`Failed to get response from AI: ${error.message}`);
     }
     throw new Error('An unknown error occurred while contacting the AI assistant.');
